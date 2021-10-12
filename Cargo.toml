@@ -7,5 +7,5 @@ license = "MIT OR Apache-2.0"
 
 [dependencies]
 hecs = "0.6.5"
-hecs-hierarchy = "0.2.9"
+hecs-hierarchy = { git = "https://github.com/sapir/hecs-hierarchy" }
 itertools = "0.10.1"
