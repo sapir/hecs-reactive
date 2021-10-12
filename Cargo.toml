@@ -6,3 +6,4 @@ edition = "2018"
 [dependencies]
 hecs = "0.6.5"
 hecs-hierarchy = "0.2.9"
+itertools = "0.10.1"
