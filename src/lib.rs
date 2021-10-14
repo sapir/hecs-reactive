@@ -28,15 +28,6 @@ pub enum UpdateKind {
     Updated,
 }
 
-fn query_singleton<T: hecs::Component>(world: &mut World) -> Option<Entity> {
-    world
-        .query_mut::<()>()
-        .with::<T>()
-        .into_iter()
-        .next()
-        .map(|(entity, ())| entity)
-}
-
 pub fn get_props(world: &World, node: Entity) -> Entity {
     world.get::<NodePropertiesLink>(node).unwrap().0
 }
@@ -126,39 +117,28 @@ fn update_children(world: &mut World, node: Entity, props: Entity) {
     }
 }
 
-pub fn update<RootMarker: hecs::Component + Default>(
-    world: &mut World,
-    new_props_root: Option<Entity>,
-) -> Option<Entity> {
-    let old_root = query_singleton::<RootMarker>(world);
-
-    match (old_root, new_props_root) {
+pub fn update(world: &mut World, root: &mut Option<Entity>, new_props_root: Option<Entity>) {
+    match (root.clone(), new_props_root) {
         (None, Some(new_props_root)) => {
-            let root = spawn_node(world, new_props_root);
-            world.insert_one(root, RootMarker::default()).unwrap();
-            Some(root)
+            *root = Some(spawn_node(world, new_props_root));
         }
 
         (Some(old_root), Some(new_props_root)) => {
             update_node(world, old_root, new_props_root);
-            Some(old_root)
         }
 
         (Some(old_root), None) => {
             despawn_node(world, old_root);
-            None
+            *root = None;
         }
 
-        (None, None) => None,
-    }
+        (None, None) => {}
+    };
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
-
-    #[derive(Default)]
-    struct MyTree;
 
     #[derive(Clone, Copy, Debug, PartialEq, Eq)]
     struct Props(u32);
@@ -186,6 +166,7 @@ mod tests {
     #[test]
     fn it_works() {
         let mut world = World::new();
+        let mut opt_root = None;
 
         let root_props = world.spawn((Props(1),));
         let child_props1 = world
@@ -195,7 +176,8 @@ mod tests {
             .attach_new::<NodeTree, _>(root_props, (Props(3),))
             .unwrap();
 
-        let root = update::<MyTree>(&mut world, Some(root_props)).unwrap();
+        update(&mut world, &mut opt_root, Some(root_props));
+        let root = opt_root.unwrap();
         let children = world.children::<NodeTree>(root).collect::<Vec<_>>();
         assert_eq!(children.len(), 2);
         check_props(&world, root, root_props, Some(Props(1)));
@@ -211,7 +193,8 @@ mod tests {
             .attach_new::<NodeTree, _>(update_root_props, (Props(200),))
             .unwrap();
 
-        let updated_root = update::<MyTree>(&mut world, Some(update_root_props)).unwrap();
+        update(&mut world, &mut opt_root, Some(update_root_props));
+        let updated_root = opt_root.unwrap();
         assert_eq!(updated_root, root);
         let updated_children = world.children::<NodeTree>(updated_root).collect::<Vec<_>>();
         assert_eq!(updated_children.len(), 1);
@@ -238,7 +221,8 @@ mod tests {
             .attach_new::<NodeTree, _>(update2_root_props, (Props(40),))
             .unwrap();
 
-        let updated2_root = update::<MyTree>(&mut world, Some(update2_root_props)).unwrap();
+        update(&mut world, &mut opt_root, Some(update2_root_props));
+        let updated2_root = opt_root.unwrap();
         assert_eq!(updated2_root, updated_root);
         let updated2_children = world
             .children::<NodeTree>(updated2_root)
